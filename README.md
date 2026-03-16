@@ -4,7 +4,7 @@ A modular Python pipeline that monitors internship sources, filters relevant rol
 
 ## Status
 
-- Phase 4 storage layer complete
+- Phase 5 filtering and scoring complete
 - Business logic is implemented in later phases
 
 ## Project Structure
@@ -70,6 +70,23 @@ Available storage methods in `Database`:
 - `was_notification_sent(fingerprint, channel)`
 - `mark_notification_sent(fingerprint, channel, message_id)`
 - `list_unsent_matching_jobs(channel, limit)`
+
+## Filtering and Scoring (Phase 5)
+
+Filtering rules (`evaluate_job`):
+- Include rule: pass when at least one include keyword is found (or include list is empty)
+- Exclude rule: fail when any exclude keyword is found
+- Location rule: pass when a preferred location matches, or the job is remote
+
+Exact scoring formula (`compute_job_score`):
+
+`total_score =`
+- `(number_of_matched_include_keywords * SCORE_INCLUDE_KEYWORD_WEIGHT)`
+- `+ SCORE_PREFERRED_LOCATION_BONUS` if location matched
+- `+ SCORE_REMOTE_BONUS` if remote detected
+- `+ SCORE_RESEARCH_BONUS` if research signal is present (`research`, `research internship`, `thesis`, `lab`)
+
+Score is additive and transparent, with component breakdown available from `ScoreBreakdown`.
 
 ## Extending Collectors
 
