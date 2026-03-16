@@ -4,7 +4,7 @@ A modular Python pipeline that monitors internship sources, filters relevant rol
 
 ## Status
 
-- Phase 6 collectors complete
+- Phase 7 Telegram notifier complete
 - Business logic is implemented in later phases
 
 ## Project Structure
@@ -104,6 +104,25 @@ Common behavior:
 Assumptions and placeholders:
 - Static collector assumes internship links are present in anchor elements and filters links containing `intern` or `research`.
 - Some websites will require selector tuning later (Phase 9/10 guidance).
+
+## Telegram Notifier (Phase 7)
+
+Implemented in [internship_bot/notifier/telegram.py](internship_bot/notifier/telegram.py):
+- Clean message formatter with title, company, location, source, date, score, and URL
+- Dry-run mode (`TELEGRAM_DRY_RUN=true`) that prints message previews instead of sending
+- Real send mode through Telegram Bot API (`sendMessage`)
+
+How to create credentials:
+1. Open Telegram and start chat with `@BotFather`
+2. Run `/newbot` and follow prompts to get `TELEGRAM_BOT_TOKEN`
+3. Start a chat with your bot (or add it to a group)
+4. Get `TELEGRAM_CHAT_ID` (personal chat ID or group ID)
+5. Put both values in `.env`
+
+Safe local testing:
+- Keep `TELEGRAM_DRY_RUN=true`
+- Run `python -m internship_bot.main`
+- Verify message previews in terminal before enabling real sends
 
 ## Extending Collectors
 

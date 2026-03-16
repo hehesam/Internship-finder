@@ -8,6 +8,7 @@ from internship_bot.config import AppConfig, load_config
 from internship_bot.filters.rules import evaluate_job
 from internship_bot.filters.scoring import compute_job_score
 from internship_bot.models.job import JobPosting
+from internship_bot.notifier.telegram import TelegramNotifier
 from internship_bot.storage.db import Database
 from internship_bot.utils.logging_config import setup_logging
 
@@ -122,10 +123,13 @@ def run_pipeline(config: AppConfig) -> None:
     ]
 
     print("[scaffold] Filter/score demo:")
+    matched_jobs: list[JobPosting] = []
     for job in sample_jobs:
         decision = evaluate_job(job, config.filters)
         breakdown = compute_job_score(job, config.filters, config.scoring, decision=decision)
         job.score = breakdown.total_score
+        if decision.is_match:
+            matched_jobs.append(job)
         print(
             "  - "
             f"{job.title} | match={decision.is_match} | score={job.score:.2f} "
@@ -134,6 +138,12 @@ def run_pipeline(config: AppConfig) -> None:
             f"| remote_bonus={breakdown.remote_bonus:.1f} "
             f"| research_bonus={breakdown.research_bonus:.1f}"
         )
+
+    notifier = TelegramNotifier(config.telegram)
+    print(f"[scaffold] Telegram demo: sending {len(matched_jobs)} matched jobs")
+    results = notifier.send_job_notifications(matched_jobs)
+    successful = sum(1 for result in results if result.success)
+    print(f"[scaffold] Telegram demo result: successful={successful}/{len(results)}")
 
 
 def main() -> None:
