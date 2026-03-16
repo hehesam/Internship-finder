@@ -1,6 +1,8 @@
 """Example collector for static HTML internship pages."""
 
 import logging
+from pathlib import Path
+from urllib.parse import urlparse
 from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
@@ -38,7 +40,7 @@ class ExampleStaticSiteCollector(BaseCollector):
         Site-specific selectors can be added later when needed.
         """
         try:
-            html = self._fetch_html(self.source_url)
+            html = self._load_source_html(self.source_url)
         except Exception as error:  # noqa: BLE001
             LOGGER.warning("Static collector failed for %s: %s", self.source_url, error)
             return []
@@ -53,7 +55,7 @@ class ExampleStaticSiteCollector(BaseCollector):
             if not href:
                 continue
 
-            absolute_url = urljoin(self.source_url, href)
+            absolute_url = self._resolve_job_url(href)
             url_lower = absolute_url.lower()
 
             if absolute_url in seen_urls:
@@ -88,6 +90,39 @@ class ExampleStaticSiteCollector(BaseCollector):
             seen_urls.add(absolute_url)
 
         return postings
+
+    def _load_source_html(self, source: str) -> str:
+        if self._is_local_source(source):
+            source_path = self._to_local_path(source)
+            return source_path.read_text(encoding="utf-8")
+        return self._fetch_html(source)
+
+    def _resolve_job_url(self, href: str) -> str:
+        if href.startswith(("http://", "https://")):
+            return href
+
+        if self._is_local_source(self.source_url):
+            base_path = self._to_local_path(self.source_url).parent
+            local_href = href.lstrip("/")
+            resolved = (base_path / local_href).resolve()
+            return resolved.as_uri()
+
+        return urljoin(self.source_url, href)
+
+    @staticmethod
+    def _is_local_source(source: str) -> bool:
+        if source.startswith("file://"):
+            return True
+        parsed = urlparse(source)
+        if parsed.scheme in {"http", "https"}:
+            return False
+        return Path(source).exists()
+
+    @staticmethod
+    def _to_local_path(source: str) -> Path:
+        if source.startswith("file://"):
+            return Path(source.replace("file://", "", 1)).resolve()
+        return Path(source).resolve()
 
     @staticmethod
     def _extract_location_hint(text: str) -> str:

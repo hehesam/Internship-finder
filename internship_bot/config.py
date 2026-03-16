@@ -174,16 +174,18 @@ def load_config() -> AppConfig:
                 default=True,
             ),
             enable_greenhouse=_to_bool(
-                os.getenv("ENABLE_GREENHOUSE", "true"),
-                default=True,
+                os.getenv("ENABLE_GREENHOUSE", "false"),
+                default=False,
             ),
             enable_lever=_to_bool(
-                os.getenv("ENABLE_LEVER", "true"),
-                default=True,
+                os.getenv("ENABLE_LEVER", "false"),
+                default=False,
             ),
         ),
         sources=SourcesConfig(
-            static_source_urls=_to_csv_list(os.getenv("STATIC_SOURCE_URLS", "")),
+            static_source_urls=_to_csv_list(
+                os.getenv("STATIC_SOURCE_URLS", "sample_data/static_jobs_sample.html")
+            ),
             greenhouse_board_tokens=_to_csv_list(
                 os.getenv("GREENHOUSE_BOARD_TOKENS", "")
             ),

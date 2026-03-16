@@ -4,8 +4,8 @@ A modular Python pipeline that monitors internship sources, filters relevant rol
 
 ## Status
 
-- Phase 8 main pipeline orchestration complete
-- Local MVP runs end-to-end with dry-run Telegram support
+- Phase 10 documentation and polish complete
+- Local MVP runs end-to-end and is ready for scheduled execution
 
 ## Project Structure
 
@@ -53,6 +53,10 @@ Run the pipeline:
 
 - `python -m internship_bot.main`
 
+Run collector-only smoke tests:
+
+- `python tools/test_collectors.py`
+
 Pipeline stages executed in order:
 1. Initialize config and logging
 2. Initialize SQLite schema
@@ -64,6 +68,39 @@ Pipeline stages executed in order:
 8. Send Telegram notifications (or dry-run previews)
 9. Mark successful notifications as sent
 10. Print run summary logs
+
+## Architecture Overview
+
+Core modules:
+- [internship_bot/main.py](internship_bot/main.py): end-to-end orchestration
+- [internship_bot/config.py](internship_bot/config.py): environment-driven typed config
+- [internship_bot/storage/db.py](internship_bot/storage/db.py): SQLite persistence and dedup state
+- [internship_bot/collectors/](internship_bot/collectors/): source-specific collectors
+- [internship_bot/filters/](internship_bot/filters/): relevance rules and scoring
+- [internship_bot/notifier/telegram.py](internship_bot/notifier/telegram.py): notification delivery
+
+Data flow:
+1. Collectors fetch raw postings and normalize to `JobPosting`
+2. Filter rules decide whether each job is relevant
+3. Scoring computes ranking priority
+4. Database upserts jobs by fingerprint (dedup)
+5. Unsent matches are selected and passed to notifier
+6. Successful sends are marked in `sent_notifications`
+
+## Local Testing Support (Phase 9)
+
+Added local-first test assets:
+- Sample static source file: [sample_data/static_jobs_sample.html](sample_data/static_jobs_sample.html)
+- Collector smoke runner: [tools/test_collectors.py](tools/test_collectors.py)
+
+Local defaults are safe:
+- `TELEGRAM_DRY_RUN=true`
+- `ENABLE_STATIC_EXAMPLE=true`
+- `ENABLE_GREENHOUSE=false`
+- `ENABLE_LEVER=false`
+- `STATIC_SOURCE_URLS=sample_data/static_jobs_sample.html`
+
+This lets you test end-to-end behavior without credentials or external API calls.
 
 ## Storage (Phase 4)
 
@@ -138,17 +175,122 @@ Safe local testing:
 
 ## Extending Collectors
 
-- Add a new class under `internship_bot/collectors/`
-- Inherit from `BaseCollector`
-- Implement `collect()` returning normalized `JobPosting` objects
+Step-by-step:
+1. Add a new module under [internship_bot/collectors/](internship_bot/collectors/), for example `my_source.py`
+2. Create a class inheriting `BaseCollector`
+3. Implement `collect()` and return `list[JobPosting]`
+4. Normalize source fields using `_safe_job(...)` from `BaseCollector`
+5. Add source toggles/values in [internship_bot/config.py](internship_bot/config.py) if needed
+6. Register collector construction in `build_collectors(...)` inside [internship_bot/main.py](internship_bot/main.py)
+7. Validate with `python tools/test_collectors.py`
 
-## Scheduling & Deployment (later)
+Minimal template:
 
-- cron
-- GitHub Actions
-- Docker / VPS
+```python
+from internship_bot.collectors.base import BaseCollector
+from internship_bot.models.job import JobPosting
+
+
+class MySourceCollector(BaseCollector):
+    name = "my_source"
+
+    def collect(self) -> list[JobPosting]:
+        jobs: list[JobPosting] = []
+        # fetch data here
+        job = self._safe_job(
+            source="my_source",
+            title="AI Internship",
+            company="Example",
+            location="Remote",
+            url="https://example.org/jobs/ai-intern",
+            source_type="custom",
+        )
+        if job:
+            jobs.append(job)
+        return jobs
+```
+
+## Scheduling & Deployment
+
+### Cron (Linux VPS)
+
+Run every 2 hours:
+
+```cron
+0 */2 * * * cd /opt/internship-finder && /opt/internship-finder/.venv/bin/python -m internship_bot.main >> /opt/internship-finder/logs/pipeline.log 2>&1
+```
+
+### GitHub Actions
+
+Create `.github/workflows/run-internship-bot.yml` with a schedule and repository secrets:
+
+```yaml
+name: Run Internship Bot
+
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python -m internship_bot.main
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_DRY_RUN: "false"
+```
+
+### Docker / VPS
+
+This repository now includes:
+- [Dockerfile](Dockerfile)
+- [.dockerignore](.dockerignore)
+
+Build image:
+
+```bash
+docker build -t internship-finder:latest .
+```
+
+Suggested approach:
+1. Build the image once
+2. Mount a persistent volume/folder for `internships.db`
+3. Inject env vars at runtime (or via `--env-file`)
+4. Run on schedule via host cron or orchestrator
+
+Minimum runtime command example:
+
+```bash
+docker run --rm \
+  -v $(pwd)/data:/app/data \
+  -e DATABASE_PATH=/app/data/internships.db \
+  -e TELEGRAM_DRY_RUN=true \
+  --env-file .env \
+  internship-finder:latest python -m internship_bot.main
+```
 
 ## Troubleshooting
 
-- If imports fail, verify package structure and current working directory.
-- If env values are missing, confirm `.env` exists and keys are set.
+- Import error `No module named internship_bot`:
+  - Run commands from repository root
+  - Or use module mode: `python -m internship_bot.main`
+- No jobs collected:
+  - Confirm source toggles and source values in `.env`
+  - Start with `STATIC_SOURCE_URLS=sample_data/static_jobs_sample.html`
+- Notifications not sent:
+  - Keep `TELEGRAM_DRY_RUN=true` for local tests
+  - For live mode, set valid `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`
+- Duplicate notifications:
+  - Check `sent_notifications` table in SQLite
+  - Ensure fingerprint stability (URL or fallback hash)
+- Unexpected collector failures:
+  - Increase `COLLECTOR_TIMEOUT_SECONDS`
+  - Test collectors independently with `python tools/test_collectors.py`
