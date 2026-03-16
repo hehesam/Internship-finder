@@ -4,8 +4,8 @@ A modular Python pipeline that monitors internship sources, filters relevant rol
 
 ## Status
 
-- Phase 7 Telegram notifier complete
-- Business logic is implemented in later phases
+- Phase 8 main pipeline orchestration complete
+- Local MVP runs end-to-end with dry-run Telegram support
 
 ## Project Structure
 
@@ -49,9 +49,21 @@ Design note:
 
 ## Usage
 
-Run the scaffold entrypoint:
+Run the pipeline:
 
 - `python -m internship_bot.main`
+
+Pipeline stages executed in order:
+1. Initialize config and logging
+2. Initialize SQLite schema
+3. Build enabled collectors from config
+4. Collect jobs from each source (isolated per collector)
+5. Filter and score each job
+6. Save/upsert jobs (deduplicated by fingerprint)
+7. Query unsent matching jobs
+8. Send Telegram notifications (or dry-run previews)
+9. Mark successful notifications as sent
+10. Print run summary logs
 
 ## Storage (Phase 4)
 
