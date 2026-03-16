@@ -4,7 +4,7 @@ A modular Python pipeline that monitors internship sources, filters relevant rol
 
 ## Status
 
-- Phase 5 filtering and scoring complete
+- Phase 6 collectors complete
 - Business logic is implemented in later phases
 
 ## Project Structure
@@ -37,6 +37,7 @@ Environment variables are loaded from `.env` via `python-dotenv`.
 
 Current config groups:
 - Runtime: `DATABASE_PATH`, `LOG_LEVEL`
+- Collector runtime: `COLLECTOR_TIMEOUT_SECONDS`, `COLLECTOR_USER_AGENT`
 - Telegram: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_DRY_RUN`
 - Source toggles: `ENABLE_STATIC_EXAMPLE`, `ENABLE_GREENHOUSE`, `ENABLE_LEVER`
 - Source values (CSV): `STATIC_SOURCE_URLS`, `GREENHOUSE_BOARD_TOKENS`, `LEVER_COMPANY_SLUGS`
@@ -87,6 +88,22 @@ Exact scoring formula (`compute_job_score`):
 - `+ SCORE_RESEARCH_BONUS` if research signal is present (`research`, `research internship`, `thesis`, `lab`)
 
 Score is additive and transparent, with component breakdown available from `ScoreBreakdown`.
+
+## Collectors (Phase 6)
+
+Implemented collectors:
+- `ExampleStaticSiteCollector`: generic static HTML collector (`requests` + `BeautifulSoup`)
+- `GreenhouseCollector`: reads `boards-api.greenhouse.io` jobs endpoint
+- `LeverCollector`: reads `api.lever.co` postings endpoint
+
+Common behavior:
+- All collectors return normalized `JobPosting` objects.
+- Missing/invalid fields are handled defensively; malformed rows are skipped.
+- Network/API errors are caught inside each collector and return an empty list.
+
+Assumptions and placeholders:
+- Static collector assumes internship links are present in anchor elements and filters links containing `intern` or `research`.
+- Some websites will require selector tuning later (Phase 9/10 guidance).
 
 ## Extending Collectors
 

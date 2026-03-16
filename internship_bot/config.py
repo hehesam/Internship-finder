@@ -62,6 +62,8 @@ class AppConfig:
 
     database_path: str
     log_level: str
+    collector_timeout_seconds: int
+    collector_user_agent: str
     telegram: TelegramConfig
     filters: FilterConfig
     scoring: ScoringConfig
@@ -81,6 +83,15 @@ def _to_float(value: str | None, default: float) -> float:
         return default
     try:
         return float(value)
+    except ValueError:
+        return default
+
+
+def _to_int(value: str | None, default: int) -> int:
+    if value is None or not value.strip():
+        return default
+    try:
+        return int(value)
     except ValueError:
         return default
 
@@ -128,6 +139,11 @@ def load_config() -> AppConfig:
     return AppConfig(
         database_path=os.getenv("DATABASE_PATH", "internships.db"),
         log_level=os.getenv("LOG_LEVEL", "INFO"),
+        collector_timeout_seconds=_to_int(
+            os.getenv("COLLECTOR_TIMEOUT_SECONDS"),
+            default=20,
+        ),
+        collector_user_agent=os.getenv("COLLECTOR_USER_AGENT", "internship-bot/1.0"),
         telegram=telegram_config,
         filters=FilterConfig(
             include_keywords=include_keywords,
